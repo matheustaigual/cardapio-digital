@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cardápio Digital · Sabor & Arte</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #f9f7f4; --card: #fff; --text: #1e1e1e; --text-soft: #6b6258;
+      --text-muted: #9b8e7d; --border: #ede9e2; --accent: #2d2d2d;
+      --accent-hover: #1e1e1e; --success: #2ecc71; --danger: #e74c3c; --gold: #b7a48b;
+    }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+      line-height: 1.4; padding: 1rem; min-height: 100vh;
+    }
+    .app-container { max-width: 1300px; width: 100%; margin: 0 auto; }
+    .header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      margin-bottom: 2rem; padding: 1rem 0.5rem; gap: 12px;
+    }
+    .logo-area h1 {
+      font-size: 1.9rem; font-weight: 800; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #2d2d2d, #5a4a3a);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .logo-area span { font-size: 0.8rem; color: #8b7d6d; display: block; margin-top: 4px; }
+    .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .connection-status {
+      display: flex; align-items: center; gap: 10px; background: #fff;
+      padding: 8px 16px; border-radius: 60px; border: 1px solid var(--border);
+      font-size: 0.85rem; font-weight: 500;
+    }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; transition: .2s; }
+    .status-dot.connected { background: var(--success); box-shadow: 0 0 0 3px rgba(46,204,113,.2); }
+    .status-dot.disconnected { background: var(--danger); box-shadow: 0 0 0 3px rgba(231,76,60,.15); }
+    .btn {
+      border: none; padding: 10px 20px; border-radius: 40px; font-weight: 600;
+      font-size: .9rem; display: inline-flex; align-items: center; gap: 10px;
+      cursor: pointer; transition: .2s; font-family: 'Inter', sans-serif;
+    }
+    .btn-dark { background: var(--accent); color: #fff; }
+    .btn-dark:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .btn-cart { background: var(--accent); color: #fff; position: relative; }
+    .btn-cart:hover { background: var(--accent-hover); }
+    .cart-badge {
+      position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff;
+      font-size: .7rem; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px;
+      display: none; align-items: center; justify-content: center; padding: 0 5px;
+    }
+    .cart-badge.visible { display: flex; }
+    .config-panel {
+      background: #fff; border-radius: 28px; padding: 1.8rem 2rem; margin-bottom: 2rem;
+      border: 1px solid var(--border); display: none;
+    }
+    .config-panel.visible { display: block; }
+    .config-panel h2 { font-size: 1.3rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px; }
+    .config-grid { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+    .input-group { flex: 1 1 240px; }
+    .input-group label {
+      display: block; font-size: .75rem; text-transform: uppercase; font-weight: 600;
+      color: #7b6e5f; margin-bottom: 6px;
+    }
+    .input-group input {
+      width: 100%; padding: 14px 16px; border-radius: 18px; border: 1.5px solid #e6e0d8;
+      font-size: .9rem; background: #fefcf9; font-family: 'Inter', sans-serif;
+    }
+    .input-group input:focus {
+      outline: none; border-color: var(--gold);
+      box-shadow: 0 0 0 4px rgba(183,164,139,.1);
+    }
+    .connection-message {
+      margin-top: 1rem; font-size: .85rem; padding: 10px 16px;
+      border-radius: 40px; display: none;
+    }
+    .message-success { background: #e2f3e5; color: #1e6f3f; }
+    .message-error { background: #fde7e7; color: #b33a3a; }
+    .section-title {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 1.8rem; flex-wrap: wrap; gap: 10px;
+    }
+    .section-title h2 { font-size: 1.7rem; font-weight: 700; }
+    .item-count {
+      font-size: .9rem; color: var(--text-muted); background: #ede9e2;
+      padding: 6px 14px; border-radius: 40px;
+    }
+    .cardapio-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1.5rem;
+    }
+    .prato-card {
+      background: #fff; border-radius: 28px; padding: 1.6rem 1.5rem;
+      border: 1px solid #f0ebe4; transition: .2s; display: flex; flex-direction: column;
+    }
+    .prato-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 24px 40px -12px rgba(0,0,0,.12); border-color: #d9d0c4;
+    }
+    .prato-nome { font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+    .prato-descricao {
+      font-size: .9rem; color: var(--text-soft); margin-bottom: 1rem; line-height: 1.5;
+      flex: 1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .prato-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; flex-wrap: wrap;
+    }
+    .prato-preco { font-size: 1.4rem; font-weight: 700; }
+    .prato-preco small { font-size: .8rem; color: var(--text-muted); }
+    .categoria-badge {
+      background: #f2eee8; color: #5a4e3f; font-size: .7rem; font-weight: 600;
+      text-transform: uppercase; padding: 6px 12px; border-radius: 40px;
+    }
+    .btn-add {
+      background: var(--accent); color: #fff; border: none; padding: 12px 16px;
+      border-radius: 40px; font-weight: 600; font-size: .85rem; cursor: pointer;
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      margin-top: 1rem; width: 100%; transition: .2s; font-family: 'Inter', sans-serif;
+    }
+    .btn-add:hover { background: var(--accent-hover); }
+    .btn-add:active { transform: scale(.98); }
+    .empty-state, .loading-state {
+      background: #fff; border-radius: 28px; padding: 3rem 2rem; text-align: center;
+      color: var(--text-muted); border: 1px dashed #ddd6cc; grid-column: 1 / -1;
+    }
+    /* Carrinho */
+    .cart-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.4);
+      opacity: 0; pointer-events: none; transition: .25s; z-index: 900;
+    }
+    .cart-overlay.active { opacity: 1; pointer-events: auto; }
+    .cart-panel {
+      position: fixed; top: 0; right: 0; width: 100%; max-width: 420px; height: 100vh;
+      background: #fff; z-index: 1000; display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+      box-shadow: -20px 0 50px rgba(0,0,0,.12);
+    }
+    .cart-panel.active { transform: translateX(0); }
+    .cart-header {
+      padding: 1.5rem 1.5rem 1rem; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cart-header h3 { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .cart-close {
+      background: #f2eee8; border: none; width: 36px; height: 36px; border-radius: 50%;
+      cursor: pointer; font-size: 1rem; color: var(--text);
+    }
+    .cart-close:hover { background: #e6dfd5; }
+    .cart-items { flex: 1; overflow-y: auto; padding: 1rem 1.5rem; }
+    .cart-empty { text-align: center; padding: 4rem 1rem; color: var(--text-muted); }
+    .cart-empty i { font-size: 3rem; opacity: .3; margin-bottom: 1rem; }
+    .cart-item {
+      display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border);
+      align-items: center;
+    }
+    .cart-item-info { flex: 1; min-width: 0; }
+    .cart-item-nome {
+      font-weight: 600; font-size: .95rem; margin-bottom: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cart-item-preco { font-size: .85rem; color: var(--text-soft); }
+    .cart-item-controls {
+      display: flex; align-items: center; gap: 6px; background: #f7f4ef;
+      border-radius: 40px; padding: 4px;
+    }
+    .qty-btn {
+      background: #fff; border: none; width: 28px; height: 28px; border-radius: 50%;
+      cursor: pointer; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    }
+    .qty-btn:hover { background: #ede9e2; }
+    .qty-value { min-width: 24px; text-align: center; font-weight: 600; font-size: .9rem; }
+    .cart-item-subtotal { font-weight: 700; font-size: .95rem; min-width: 75px; text-align: right; }
+    .cart-footer { padding: 1.2rem 1.5rem 1.5rem; border-top: 1px solid var(--border); background: #fdfbf8; }
+    .cart-total { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; }
+    .cart-total-label { font-size: .9rem; color: var(--text-soft); font-weight: 500; }
+    .cart-total-value { font-size: 1.7rem; font-weight: 800; }
+    .btn-checkout {
+      width: 100%; background: var(--accent); color: #fff; border: none; padding: 16px;
+      border-radius: 40px; font-weight: 700; font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-checkout:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-checkout:disabled { opacity: .5; cursor: not-allowed; }
+    .toast-container {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 2000; display: flex; flex-direction: column; gap: 10px; align-items: center;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--accent); color: #fff; padding: 12px 22px; border-radius: 40px;
+      font-size: .9rem; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,.2);
+      display: flex; align-items: center; gap: 10px; animation: toastIn .3s ease;
+      max-width: 90vw;
+    }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .footer {
+      margin-top: 3rem; padding: 1.5rem 0 .5rem; text-align: center;
+      font-size: .75rem; color: #b3a89b; border-top: 1px solid var(--border);
+    }
+    @media (max-width: 600px) {
+      body { padding: .8rem; }
+      .logo-area h1 { font-size: 1.5rem; }
+      .cardapio-grid { grid-template-columns: 1fr; }
+      .config-grid { flex-direction: column; align-items: stretch; }
+      .cart-panel { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <header class="header">
+    <div class="logo-area">
+      <h1>Sabor & Arte</h1>
+      <span>cardápio digital · experiência moderna</span>
+    </div>
+    <div class="header-actions">
+      <div class="connection-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Desconectado</span>
+      </div>
+      <button class="btn btn-dark" id="toggleConfigBtn">
+        <i class="fas fa-sliders-h"></i> Conectar
+      </button>
+      <button class="btn btn-cart" id="openCartBtn">
+        <i class="fas fa-shopping-bag"></i> Carrinho
+        <span class="cart-badge" id="cartBadge">0</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="config-panel" id="configPanel">
+    <h2><i class="fas fa-database" style="color: var(--gold);"></i> Configurar Supabase</h2>
+    <div class="config-grid">
+      <div class="input-group">
+        <label for="supabaseUrl">URL do projeto</label>
+        <input type="text" id="supabaseUrl" placeholder="https://xxxxx.supabase.co">
+      </div>
+      <div class="input-group">
+        <label for="supabaseKey">Chave pública (anon)</label>
+        <input type="text" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIs...">
+      </div>
+      <button class="btn btn-dark" id="connectBtn">
+        <i class="fas fa-link"></i> Conectar
+      </button>
+    </div>
+    <div id="connectionMessage" class="connection-message"></div>
+  </div>
+
+  <section class="menu-section">
+    <div class="section-title">
+      <h2>Menu do dia</h2>
+      <span class="item-count" id="itemCount">0 itens</span>
+    </div>
+    <div class="cardapio-grid" id="cardapioGrid">
+      <div class="empty-state">
+        <i class="fas fa-plug" style="font-size: 2rem; margin-bottom: 1rem; opacity: .4;"></i>
+        <p>Conecte-se ao Supabase para carregar o cardápio.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>© 2025 Sabor & Arte — Cardápio digital moderno</p>
+  </footer>
+</div>
+
+<div class="cart-overlay" id="cartOverlay"></div>
+
+<aside class="cart-panel" id="cartPanel">
+  <div class="cart-header">
+    <h3><i class="fas fa-shopping-bag"></i> Seu pedido</h3>
+    <button class="cart-close" id="closeCartBtn"><i class="fas fa-times"></i></button>
+  </div>
+  <div class="cart-items" id="cartItems">
+    <div class="cart-empty">
+      <i class="fas fa-shopping-basket"></i>
+      <p>Seu carrinho está vazio.</p>
+    </div>
+  </div>
+  <div class="cart-footer">
+    <div class="cart-total">
+      <span class="cart-total-label">Total</span>
+      <span class="cart-total-value" id="cartTotal">R$ 0,00</span>
+    </div>
+    <button class="btn-checkout" id="checkoutBtn" disabled>
+      <i class="fas fa-check-circle"></i> Finalizar pedido
+    </button>
+  </div>
+</aside>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ========== ESTADO ==========
+  let supabaseClient = null;
+  let carrinho = {}; // { id: { prato, quantidade } }
+
+  // ========== DOM ==========
+  const $ = (id) => document.getElementById(id);
+  const toggleConfigBtn = $('toggleConfigBtn');
+  const configPanel = $('configPanel');
+  const supabaseUrlInput = $('supabaseUrl');
+  const supabaseKeyInput = $('supabaseKey');
+  const connectBtn = $('connectBtn');
+  const statusDot = $('statusDot');
+  const statusText = $('statusText');
+  const cardapioGrid = $('cardapioGrid');
+  const itemCount = $('itemCount');
+  const connectionMessage = $('connectionMessage');
+  const openCartBtn = $('openCartBtn');
+  const closeCartBtn = $('closeCartBtn');
+  const cartPanel = $('cartPanel');
+  const cartOverlay = $('cartOverlay');
+  const cartItems = $('cartItems');
+  const cartTotal = $('cartTotal');
+  const cartBadge = $('cartBadge');
+  const checkoutBtn = $('checkoutBtn');
+  const toastContainer = $('toastContainer');
+
+  // ========== HELPERS ==========
+  function escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+  }
+  function fmtMoney(v) {
+    return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
+  }
+  function toast(msg, type) {
+    const el = document.createElement('div');
+    el.className = 'toast' + (type ? ' ' + type : '');
+    const icon = type === 'success' ? 'fa-check' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+    el.innerHTML = '<i class="fas ' + icon + '"></i> ' + escapeHtml(msg);
+    toastContainer.appendChild(el);
+    setTimeout(function() {
+      el.style.transition = '.3s';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      setTimeout(function() { el.remove(); }, 300);
+    }, 2800);
+  }
+  function updateStatusUI(connected) {
+    statusDot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+    statusText.innerText = connected ? 'Conectado' : 'Desconectado';
+  }
+  function showMessage(text, isError) {
+    connectionMessage.style.display = 'inline-block';
+    connectionMessage.textContent = text;
+    connectionMessage.className = 'connection-message ' + (isError ? 'message-error' : 'message-success');
+  }
+  function hideMessage() { connectionMessage.style.display = 'none'; }
+
+  // ========== CARRINHO (localStorage) ==========
+  function carregarCarrinhoLocal() {
+    try {
+      const raw = localStorage.getItem('carrinho_sabor_arte');
+      carrinho = raw ? JSON.parse(raw) : {};
+      if (typeof carrinho !== 'object' || carrinho === null) carrinho = {};
+    } catch (e) { carrinho = {}; }
+  }
+  function salvarCarrinhoLocal() {
+    try { localStorage.setItem('carrinho_sabor_arte', JSON.stringify(carrinho)); } catch (e) {}
+  }
+  function adicionarAoCarrinho(prato) {
+    const id = String(prato.id);
+    if (!carrinho[id]) carrinho[id] = { prato: prato, quantidade: 1 };
+    else carrinho[id].quantidade += 1;
+    salvarCarrinhoLocal();
+    renderCarrinho();
+    toast(prato.nome + ' adicionado ao carrinho!', 'success');
+  }
+  function alterarQuantidade(id, delta) {
+    id = String(id);
+    if (!carrinho[id]) return;
+    carrinho[id].quantidade += delta;
+    if (carrinho[id].quantidade <= 0) delete carrinho[id];
+    salvarCarrinhoLocal();
+    renderCarrinho();
+  }
+  function renderCarrinho() {
+    const items = Object.values(carrinho);
+    const totalQtd = items.reduce(function(s, i) { return s + i.quantidade; }, 0);
+    const totalValor = items.reduce(function(s, i) { return s + Number(i.prato.preco) * i.quantidade; }, 0);
+
+    if (totalQtd > 0) {
+      cartBadge.textContent = totalQtd;
+      cartBadge.classList.add('visible');
+    } else {
+      cartBadge.classList.remove('visible');
+    }
+    cartTotal.textContent = fmtMoney(totalValor);
+    checkoutBtn.disabled = items.length === 0;
+
+    if (items.length === 0) {
+      cartItems.innerHTML = '<div class="cart-empty"><i class="fas fa-shopping-basket"></i><p>Seu carrinho está vazio.</p><p style="font-size:.8rem;margin-top:6px;">Adicione pratos do menu.</p></div>';
+      return;
+    }
+
+    let html = '';
+    items.forEach(function(item) {
+      const p = item.prato;
+      const subtotal = Number(p.preco) * item.quantidade;
+      html += '<div class="cart-item">' +
+        '<div class="cart-item-info">' +
+          '<div class="cart-item-nome">' + escapeHtml(p.nome) + '</div>' +
+          '<div class="cart-item-preco">' + fmtMoney(p.preco) + ' un.</div>' +
+        '</div>' +
+        '<div class="cart-item-controls">' +
+          '<button class="qty-btn" data-action="dec" data-id="' + p.id + '">−</button>' +
+          '<span class="qty-value">' + item.quantidade + '</span>' +
+          '<button class="qty-btn" data-action="inc" data-id="' + p.id + '">+</button>' +
+        '</div>' +
+        '<div class="cart-item-subtotal">' + fmtMoney(subtotal) + '</div>' +
+      '</div>';
+    });
+    cartItems.innerHTML = html;
+
+    const botoes = cartItems.querySelectorAll('.qty-btn');
+    for (let i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function() {
+        const id = this.dataset.id;
+        const delta = this.dataset.action === 'inc' ? 1 : -1;
+        alterarQuantidade(id, delta);
+      });
+    }
+  }
+  function abrirCarrinho() {
+    cartPanel.classList.add('active');
+    cartOverlay.classList.add('active');
+  }
+  function fecharCarrinho() {
+    cartPanel.classList.remove('active');
+    cartOverlay.classList.remove('active');
+  }
+
+  // ========== FINALIZAR PEDIDO ==========
+  async function finalizarPedido() {
+    const items = Object.values(carrinho);
+    if (items.length === 0) return;
+
+    if (!supabaseClient) {
+      toast('Conecte ao Supabase para finalizar o pedido.', 'error');
+      return;
+    }
+
+    checkoutBtn.disabled = true;
+    checkoutBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Enviando...';
+
+    const total = items.reduce(function(s, i) { return s + Number(i.prato.preco) * i.quantidade; }, 0);
+    const payload = {
+      itens: items.map(function(i) {
+        return {
+          id: i.prato.id,
+          nome: i.prato.nome,
+          preco: Number(i.prato.preco),
+          quantidade: i.quantidade,
+          subtotal: Number(i.prato.preco) * i.quantidade
+        };
+      }),
+      total: total,
+      status: 'pendente'
+    };
+
+    try {
+      const res = await supabaseClient.from('pedidos').insert([payload]).select();
+      if (res.error) throw res.error;
+
+      toast('Pedido enviado com sucesso!', 'success');
+      carrinho = {};
+      salvarCarrinhoLocal();
+      renderCarrinho();
+      fecharCarrinho();
+    } catch (err) {
+      console.error('Erro ao finalizar pedido:', err);
+      let msg = err && err.message ? err.message : 'Tente novamente.';
+      if (msg.indexOf('relation') !== -1 || msg.indexOf('pedidos') !== -1) {
+        msg = 'Tabela "pedidos" não existe. Execute o SQL no Supabase.';
+      }
+      toast('Erro: ' + msg, 'error');
+    } finally {
+      checkoutBtn.disabled = false;
+      checkoutBtn.innerHTML = '<i class="fas fa-check-circle"></i> Finalizar pedido';
+    }
+  }
+
+  // ========== SUPABASE ==========
+  async function conectarSupabase(url, key) {
+    if (!url || !key) { showMessage('Preencha URL e chave de acesso.', true); return false; }
+    if (url.indexOf('https://') !== 0) { showMessage('URL deve começar com https://', true); return false; }
+
+    try {
+      const client = supabase.createClient(url, key);
+      const test = await client.from('pratos').select('id', { count: 'exact', head: true }).limit(1);
+      if (test.error) {
+        const m = test.error.message || '';
+        if (m.indexOf('JWT') !== -1 || m.indexOf('Invalid API key') !== -1 || test.error.code === '401' || test.error.code === '403') {
+          throw new Error('Chave de API inválida ou sem permissão.');
+        }
+      }
+      supabaseClient = client;
+      updateStatusUI(true);
+      hideMessage();
+      sessionStorage.setItem('supabase_url', url);
+      sessionStorage.setItem('supabase_key', key);
+      showMessage('Conectado com sucesso!', false);
+      await carregarPratos();
+      return true;
+    } catch (err) {
+      console.error('Erro na conexão:', err);
+      let errorMsg = 'Falha na conexão. Verifique URL e chave.';
+      if (err && err.message) {
+        if (err.message.indexOf('fetch') !== -1 || err.message.indexOf('network') !== -1) {
+          errorMsg = 'Erro de rede. Verifique a URL e sua internet.';
+        } else {
+          errorMsg = err.message;
+        }
+      }
+      showMessage(errorMsg, true);
+      updateStatusUI(false);
+      supabaseClient = null;
+      return false;
+    }
+  }
+
+  // ========== PRATOS ==========
+  async function carregarPratos() {
+    if (!supabaseClient) return;
+    cardapioGrid.innerHTML = '<div class="loading-state"><i class="fas fa-spinner fa-pulse"></i> Carregando cardápio...</div>';
+
+    try {
+      const res = await supabaseClient.from('pratos').select('*').order('id', { ascending: true });
+      if (res.error) {
+        console.error('Erro ao buscar pratos:', res.error);
+        cardapioGrid.innerHTML = '<div class="empty-state"><p>Erro ao carregar: ' + escapeHtml(res.error.message) + '</p></div>';
+        return;
+      }
+      renderPratos(res.data || []);
+    } catch (err) {
+      console.error(err);
+      cardapioGrid.innerHTML = '<div class="empty-state"><p>Erro inesperado ao carregar os dados.</p></div>';
+    }
+  }
+
+  function renderPratos(pratos) {
+    if (!pratos || pratos.length === 0) {
+      cardapioGrid.innerHTML = '<div class="empty-state"><i class="fas fa-utensils" style="font-size:2rem;margin-bottom:1rem;opacity:.4;"></i><p>Nenhum prato cadastrado ainda.</p></div>';
+      itemCount.innerText = '0 itens';
+      return;
+    }
+    itemCount.innerText = pratos.length + (pratos.length === 1 ? ' item' : ' itens');
+
+    let html = '';
+    pratos.forEach(function(p) {
+      const preco = Number(p.preco).toFixed(2).replace('.', ',');
+      html += '<div class="prato-card">' +
+        '<div class="prato-nome">' + escapeHtml(p.nome) + '</div>' +
+        '<div class="prato-descricao">' + escapeHtml(p.descricao || '') + '</div>' +
+        '<div class="prato-footer">' +
+          '<div class="prato-preco"><small>R$</small> ' + preco + '</div>' +
+          '<div class="categoria-badge">' + escapeHtml(p.categoria || 'Geral') + '</div>' +
+        '</div>' +
+        '<button class="btn-add" data-id="' + p.id + '"><i class="fas fa-plus"></i> Adicionar</button>' +
+      '</div>';
+    });
+    cardapioGrid.innerHTML = html;
+
+    const botoes = cardapioGrid.querySelectorAll('.btn-add');
+    for (let i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function() {
+        const id = this.dataset.id;
+        const prato = pratos.find(function(x) { return String(x.id) === String(id); });
+        if (prato) adicionarAoCarrinho(prato);
+      });
+    }
+  }
+
+  // ========== EVENTOS ==========
+  toggleConfigBtn.addEventListener('click', function() {
+    configPanel.classList.toggle('visible');
+    if (configPanel.classList.contains('visible')) supabaseUrlInput.focus();
+  });
+
+  connectBtn.addEventListener('click', async function() {
+    const url = supabaseUrlInput.value.trim();
+    const key = supabaseKeyInput.value.trim();
+    connectBtn.disabled = true;
+    connectBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Conectando...';
+    await conectarSupabase(url, key);
+    connectBtn.disabled = false;
+    connectBtn.innerHTML = '<i class="fas fa-link"></i> Conectar';
+  });
+
+  supabaseKeyInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); connectBtn.click(); }
+  });
+
+  openCartBtn.addEventListener('click', abrirCarrinho);
+  closeCartBtn.addEventListener('click', fecharCarrinho);
+  cartOverlay.addEventListener('click', fecharCarrinho);
+  checkoutBtn.addEventListener('click', finalizarPedido);
+
+  // ========== INIT ==========
+  function init() {
+    updateStatusUI(false);
+    carregarCarrinhoLocal();
+    renderCarrinho();
+
+    const savedUrl = sessionStorage.getItem('supabase_url');
+    const savedKey = sessionStorage.getItem('supabase_key');
+    if (savedUrl && savedKey) {
+      supabaseUrlInput.value = savedUrl;
+      supabaseKeyInput.value = savedKey;
+      conectarSupabase(savedUrl, savedKey);
+    }
+  }
+  init();
+})();
+</script>
+</body>
+</html>
